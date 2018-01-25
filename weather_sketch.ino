@@ -49,6 +49,9 @@ void loop(){
 
   lcd.clear();
 
+  // note  that my LCD is a 20x4 model, so you may need to squeeze things into 
+  // something smaller. 
+  
   //print temp
   String tempString = String(temperature,1);
   lcd.print("Temp : ");
