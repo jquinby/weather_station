@@ -8,7 +8,7 @@
 #include <Adafruit_BME280.h>
 
 #include "arduino_secrets.h"
-///////please enter your sensitive data in the Secret tab/arduino_secrets.h
+// please enter your sensitive data in the Secret tab/arduino_secrets.h
 
 #define BME_SCK  30
 #define BME_MISO 32
@@ -16,7 +16,7 @@
 #define BME_CS   36
 
 #define SEALEVELPRESSURE_HPA (1013.25)
-#define ALTITUDE 186 // altitude of Murfreesboro in meters, not really needed
+#define ALTITUDE 186 // altitude of Murfreesboro in meters
 
 float temperature;
 float humidity;
@@ -28,9 +28,8 @@ int t;
 
 Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK); // software SPI
 
-char ssid[] = SECRET_SSID;        // your network SSID (name)
-char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
-int keyIndex = 0;                 // your network key Index number (needed only for WEP)
+char ssid[] = SECRET_SSID;    // network SSID (name)
+char pass[] = SECRET_PASS;    // network password (use for WPA, or use as key for WEP)
 
 int status = WL_IDLE_STATUS;
 
@@ -61,7 +60,7 @@ void setup() {
     delay(10000);
   }
   server.begin();
-  // you're connected now, so print out the status:
+  // you're connected now, so print out the status:\
 
   printWiFiStatus();
 
@@ -93,8 +92,6 @@ void loop() {
     // an http request ends with a blank line
     boolean currentLineIsBlank = true;
 
-
-
     while (client.connected()) {
       if (client.available()) {
 
@@ -112,12 +109,11 @@ void loop() {
           getDewPoint();
           
           // this will probably be edited slightly to return JSON
-          // rather than HTML, but whatev
 
           client.println("HTTP/1.1 200 OK");
           client.println("Content-Type: text/html");
-          client.println("Connection: close");  // the connection will be closed after completion of the response
-          client.println("Refresh: 5");  // refresh the page automatically every 5 sec
+          client.println("Connection: close");  
+          client.println("Refresh: 5");   
           client.println();
           client.println("<!DOCTYPE HTML>");
           client.println("<html>");
@@ -186,9 +182,10 @@ float getDewPoint()
   temperature = bme.readTemperature() * 9 / 5 + 32;
   humidity = bme.readHumidity();
 
-  // dew point calculation
+  // Here follows the August-Roche-Magnus approximation of dew point:
   // 243.04*(LN(RH/100)+((17.625*T)/(243.04+T)))/(17.625-LN(RH/100)-((17.625*T)/(243.04+T)))
-  // via http://andrew.rsmas.miami.edu/bmcnoldy/Humidity.html
+  // (via http://andrew.rsmas.miami.edu/bmcnoldy/Humidity.html)
+  // if you think this is gnarly, you should see the formula for calculating heat indices
 
   dewpoint = 243.04 * (log(humidity / 100) + ((17.625 * temperature) / (243.04 + temperature))) / (17.625 - log(humidity / 100) - ((17.625 * temperature) / (243.04 + temperature)));
 
