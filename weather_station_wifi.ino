@@ -1,12 +1,8 @@
 #include <Adafruit_BME280.h>
 
 /*
-  WiFi Web Server -
-  Another stage of the work-in-progress. Some BME280 sensor readings grafted into the
-  sample WiFi Web Server that comes with the WIFI101 library examples. Nothing spectacular
-  here.
-  
- */
+  WiFi Web Server
+*/
 
 #include <SPI.h>
 #include <WiFi101.h>
@@ -16,18 +12,23 @@
 #include "arduino_secrets.h"
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 
-
 #define BME_SCK  30
 #define BME_MISO 32
 #define BME_MOSI 34
 #define BME_CS   36
 
 #define SEALEVELPRESSURE_HPA (1013.25)
-#define ALTITUDE 186 // altitude of Murfreesboro in meters
+#define ALTITUDE 186 // altitude of Murfreesboro in meters, not really needed
 
+float temperature;
+float humidity;
+float pressure;
+float dewpoint;
+
+bool bmestatus;
+int t;
 
 Adafruit_BME280 bme(BME_CS, BME_MOSI, BME_MISO, BME_SCK); // software SPI
-
 
 char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
@@ -63,26 +64,39 @@ void setup() {
   }
   server.begin();
   // you're connected now, so print out the status:
-  
+
   printWiFiStatus();
 
-    bme.begin();
-  
+  bmestatus = bme.begin();
+  if (!bmestatus) {
+    Serial.println("Error. Check BME280 connections");
+    while (1);
+  }
+
+  // give the bme280 time to initialize, otherwise the webserver will wedge
+  // as it tries to read the sensors.
+ 
+  Serial.println("Pausing for BME...");
+
+  while (t < 10) {
+    delay (1000);
+    Serial.print(String(t) + "...");
+    t = t + 1;
+  }
 }
 
 void loop() {
   // listen for incoming clients
 
- 
   WiFiClient client = server.available();
   if (client) {
     Serial.println("new client");
-    
-         // an http request ends with a blank line
+
+    // an http request ends with a blank line
     boolean currentLineIsBlank = true;
 
-    
-    
+
+
     while (client.connected()) {
       if (client.available()) {
 
@@ -93,7 +107,15 @@ void loop() {
         // so you can send a reply
         if (c == '\n' && currentLineIsBlank) {
           // send a standard http response header
-      
+
+          getPressure();
+          getHumidity();
+          getTemperature();
+          getDewPoint();
+          
+          // this will probably be edited slightly to return JSON
+          // rather than HTML, but whatev
+
           client.println("HTTP/1.1 200 OK");
           client.println("Content-Type: text/html");
           client.println("Connection: close");  // the connection will be closed after completion of the response
@@ -101,9 +123,10 @@ void loop() {
           client.println();
           client.println("<!DOCTYPE HTML>");
           client.println("<html>");
-          client.println("Temperature: " + String(bme.readTemperature() * 9/5+32,1) +"&deg; F <br>");
-          client.println("Relative Humidity: " + String(bme.readHumidity(),1) +"%<br>");
-          client.println("Barometer: " + String(bme.readPressure()/100.0F,1) +"mb<br>");
+          client.println("Temperature: " + String(temperature, 1) + "&deg; F <br>");
+          client.println("Relative Humidity: " + String(humidity, 0) + "%<br>");
+          client.println("Barometer: " + String(pressure, 2) + "mb<br>");
+          client.println("Dew Point: " + String(dewpoint, 1) + "&deg; F<br>");
           client.println("</html>");
           break;
         }
@@ -143,4 +166,33 @@ void printWiFiStatus() {
   Serial.println(" dBm");
 }
 
+float getTemperature()
+{
+  temperature = bme.readTemperature() * 9 / 5 + 32;
+}
+
+float getHumidity()
+{
+  humidity = bme.readHumidity();
+}
+
+float getPressure()
+{
+  pressure = bme.readPressure();
+  pressure = bme.seaLevelForAltitude(ALTITUDE, pressure);
+  pressure = pressure / 100.0F;
+}
+
+float getDewPoint()
+{
+  temperature = bme.readTemperature() * 9 / 5 + 32;
+  humidity = bme.readHumidity();
+
+  // dew point calculation
+  // 243.04*(LN(RH/100)+((17.625*T)/(243.04+T)))/(17.625-LN(RH/100)-((17.625*T)/(243.04+T)))
+  // via http://andrew.rsmas.miami.edu/bmcnoldy/Humidity.html
+
+  dewpoint = 243.04 * (log(humidity / 100) + ((17.625 * temperature) / (243.04 + temperature))) / (17.625 - log(humidity / 100) - ((17.625 * temperature) / (243.04 + temperature)));
+
+}
 
