@@ -7,8 +7,9 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 
-#include "arduino_secrets.h"
 // please enter your sensitive data in the Secret tab/arduino_secrets.h
+#include "arduino_secrets.h"
+
 
 #define BME_SCK  30
 #define BME_MISO 32
@@ -22,6 +23,8 @@ float temperature;
 float humidity;
 float pressure;
 float dewpoint;
+float td;
+float temp;
 
 bool bmestatus;
 int t;
@@ -60,8 +63,7 @@ void setup() {
     delay(10000);
   }
   server.begin();
-  // you're connected now, so print out the status:\
-
+  // you're connected now, so print out the status:
   printWiFiStatus();
 
   bmestatus = bme.begin();
@@ -113,7 +115,7 @@ void loop() {
           client.println("HTTP/1.1 200 OK");
           client.println("Content-Type: text/html");
           client.println("Connection: close");  
-          client.println("Refresh: 5");   
+          client.println("Refresh: 60");   
           client.println();
           client.println("<!DOCTYPE HTML>");
           client.println("<html>");
@@ -121,6 +123,9 @@ void loop() {
           client.println("Relative Humidity: " + String(humidity, 0) + "%<br>");
           client.println("Barometer: " + String(pressure, 2) + "mb<br>");
           client.println("Dew Point: " + String(dewpoint, 1) + "&deg; F<br>");
+          
+          //temp, relative humidity, barometer, dewpoint
+          client.println(" "  + String(temperature, 1) + "|" + String(humidity, 0) + "|" + String(pressure, 2) + "|" + String(dewpoint, 1) +"<br>");
           client.println("</html>");
           break;
         }
@@ -135,7 +140,7 @@ void loop() {
       }
     }
     // give the web browser time to receive the data
-    delay(1);
+    delay(1000);
 
     // close the connection:
     client.stop();
@@ -162,7 +167,8 @@ void printWiFiStatus() {
 
 float getTemperature()
 {
-  temperature = bme.readTemperature() * 9 / 5 + 32;
+  // temp seems to be consistenly 5 degrees F too high, so making a dirty adjustment here.
+  temperature = bme.readTemperature() * 9 / 5 + 32 - 5;
 }
 
 float getHumidity()
@@ -179,15 +185,16 @@ float getPressure()
 
 float getDewPoint()
 {
-  temperature = bme.readTemperature() * 9 / 5 + 32;
+  temp = bme.readTemperature();
   humidity = bme.readHumidity();
 
   // Here follows the August-Roche-Magnus approximation of dew point:
   // 243.04*(LN(RH/100)+((17.625*T)/(243.04+T)))/(17.625-LN(RH/100)-((17.625*T)/(243.04+T)))
   // (via http://andrew.rsmas.miami.edu/bmcnoldy/Humidity.html)
   // if you think this is gnarly, you should see the formula for calculating heat indices
+  // note that the inputs for this formula should be in Celsius
 
-  dewpoint = 243.04 * (log(humidity / 100) + ((17.625 * temperature) / (243.04 + temperature))) / (17.625 - log(humidity / 100) - ((17.625 * temperature) / (243.04 + temperature)));
+  td = 243.04 * (log(humidity / 100) + ((17.625 * temp) / (243.04 + temp))) / (17.625 - log(humidity / 100) - ((17.625 * temp) / (243.04 + temp)));
+  dewpoint = td * 9 / 5 + 32 - 5;
 
 }
-
